@@ -1,0 +1,8 @@
+{
+  "name": "sra-worklog",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test src/dates.test.js src/allocation.test.js src/surface.test.js src/attendanceSummary.test.js src/attendanceLog.test.js"
+  }
+}

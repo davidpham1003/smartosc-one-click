@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SmartOSC - One Click</title>
+    <link rel="stylesheet" href="sidepanel.css" />
+  </head>
+  <body>
+    <header class="top">
+      <div>
+        <p class="eyebrow">SmartOSC</p>
+        <h1>One Click</h1>
+        <p id="session">Đang kiểm tra trang…</p>
+      </div>
+      <button type="button" id="reload" class="ghost">Tải lại</button>
+    </header>
+
+    <div id="banner" class="banner" hidden role="alert"></div>
+
+    <div id="logwork" hidden>
+    <form id="form" novalidate>
+      <fieldset id="fields">
+        <label>
+          <span class="field-name">Tháng <span class="req" aria-hidden="true">*</span></span>
+          <input id="month" name="month" type="month" required />
+        </label>
+
+        <label>
+          <span class="field-name">Loại công việc <span class="req" aria-hidden="true">*</span></span>
+          <select id="type-of-work" name="typeOfWork" required>
+            <option value="">Đang kiểm tra…</option>
+          </select>
+        </label>
+        <p class="hint">Dùng cho mọi project trong tháng.</p>
+
+        <label>
+          <span class="field-name">Mô tả</span>
+          <textarea id="description" name="description" rows="3"></textarea>
+        </label>
+        <p class="hint">Nếu điền, dùng cho mọi project trong tháng.</p>
+
+        <div class="days">
+          <div class="days-head">
+            <span id="days-label">Ngày off</span>
+            <button type="button" id="add-day-off" class="ghost">Thêm ngày</button>
+          </div>
+          <div id="days-off" aria-labelledby="days-label"></div>
+          <p class="hint">Những ngày này sẽ không được log work. Cuối tuần, ngày lễ và các ngày sau hôm nay cũng được bỏ qua.</p>
+        </div>
+
+        <p class="warn" role="note">Ngày đã có worklog sẽ được bỏ qua. Ngày lệch số giờ sẽ không bị ghi đè worklog.</p>
+        <p id="form-error" class="form-error" hidden role="alert"></p>
+        <button type="submit" id="submit">Log work</button>
+      </fieldset>
+    </form>
+
+    <p id="status" class="status" hidden aria-live="polite"></p>
+    <div id="summary" class="summary" hidden></div>
+
+    <div id="empty" class="empty">
+      <p class="empty-title">Chưa có kết quả</p>
+      <p>Sau khi bấm log work, kết quả sẽ hiện ở đây, nhóm theo ngày.</p>
+    </div>
+
+    <div id="table-wrap" class="table-wrap" hidden>
+      <table>
+        <caption>Kết quả worklog</caption>
+        <thead>
+          <tr>
+            <th>Project</th>
+            <th>Số giờ</th>
+            <th>Kết quả</th>
+            <th>Chi tiết</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    </div>
+
+    <section id="people" hidden>
+      <div id="people-announce" class="announce" hidden role="status"></div>
+      <label>
+        <span class="field-name">Tháng</span>
+        <input id="people-month" type="month" />
+      </label>
+      <p id="people-status" class="status" hidden></p>
+      <div id="people-summary" class="summary" hidden></div>
+      <button type="button" id="log-all" hidden>Log all</button>
+      <div id="people-buckets" class="buckets"></div>
+    </section>
+
+    <footer class="disclaimer">
+      One Click được phát triển bởi <strong>luongLQ</strong>. Mọi góp ý hay ý tưởng, vui lòng nhắn
+      <strong>luongpq</strong> trên Google Chat. Cảm ơn bạn đã sử dụng.
+    </footer>
+
+    <dialog id="session-dialog">
+      <p id="session-dialog-text">Phiên đăng nhập đã hết hạn. Bấm OK để tải lại trang và đăng nhập lại.</p>
+      <button type="button" id="session-ok">OK</button>
+    </dialog>
+
+    <script type="module" src="src/sidepanel.js"></script>
+  </body>
+</html>
