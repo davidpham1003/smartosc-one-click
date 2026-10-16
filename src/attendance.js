@@ -430,6 +430,10 @@ export async function runInZohoPage(request) {
     if (!reportResult.ok) return reportResult;
     const erecno = reportResult.data && reportResult.data.monthDetails && reportResult.data.monthDetails.eno;
     if (!erecno) return fail("missing-erecno", { message: "Không thấy mã nhân viên." });
+    const orgUserResult = await postForm("commonAction/getOrgUserListNew", {
+      isInit: "false",
+      userIds: JSON.stringify([String(erecno)]),
+    });
     const viewResult = await postForm("AttendanceAction.zp", {
       mode: "getAttFiloInfo",
       isAddRegRequest: "true",
@@ -449,6 +453,8 @@ export async function runInZohoPage(request) {
       report: reportResult.ok ? reportResult.data : null,
       reportError: reportResult.ok ? "" : reportResult.message || "Không tải được tổng tháng.",
       erecno: String(logErecno),
+      orgUser: orgUserResult.ok ? orgUserResult.data : null,
+      orgUserError: orgUserResult.ok ? "" : orgUserResult.message || "Không tải được thông tin nhân viên.",
       requests,
       requestsError,
     };

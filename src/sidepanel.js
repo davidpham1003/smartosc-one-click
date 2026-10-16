@@ -2,8 +2,10 @@ import { compareWorkLogs, hasWorkLogs, mismatchMessage } from "./allocation.js";
 import {
   applyRequestStatus,
   earliestFullCheckout,
+  formatCountdown,
   indexRequestStatus,
   readReportHeading,
+  remainingMsUntilCheckout,
   summarizeAttendance,
 } from "./attendanceSummary.js";
 import {
@@ -15,12 +17,16 @@ import {
   runInZohoPage,
   selectDaysToLog,
 } from "./attendance.js";
+import { accessFromOrgUser, canAccess, deptNameListFromUser } from "./access.js";
 import { runInPage } from "./bridge.js";
 import { classifyMonthDays, clampToToday } from "./dates.js";
-import { detectSurface } from "./surface.js";
+import { detectSurface, loginMessage, timesheetHref, unsupportedMessage } from "./surface.js";
+import { loadAllowedAccounts, loadWhitelist } from "./whitelist.js";
 
-const TIMESHEET_URL = "https://sra.smartosc.com/time-sheet";
-const LOGIN_MESSAGE = `Đăng nhập tại ${TIMESHEET_URL} để tiếp tục log work.`;
+let whitelistEntries = [];
+let allowedAccounts = new Set();
+const ACCESS_DENIED_MESSAGE =
+  "Bạn không có quyền sử dụng One Click. Hiện tại app chỉ hỗ trợ member Division 8, vui lòng liên hệ luongpq để được cấp quyền.";
 const SESSION_EXPIRED_MESSAGE = "Phiên đăng nhập đã hết hạn. Bấm OK để tải lại trang và đăng nhập lại.";
 
 const monthInput = document.querySelector("#month");
@@ -58,6 +64,7 @@ let peopleSourceTabId = null;
 let peopleErecno = "";
 let peopleAttendance = null;
 let peopleLogging = false;
+let checkoutTimer = null;
 const peopleDayButtons = new Map();
 const loggedDates = new Set();
 let sessionReady = false;
@@ -160,16 +167,18 @@ function collectDaysOff() {
 function showBanner(message) {
   banner.hidden = false;
   banner.replaceChildren();
-  if (message !== LOGIN_MESSAGE) {
+  const loginText = loginMessage(whitelistEntries);
+  if (message !== loginText) {
     banner.textContent = message;
     return;
   }
+  const url = timesheetHref(whitelistEntries);
   banner.append("Đăng nhập tại ");
   const link = document.createElement("a");
-  link.href = TIMESHEET_URL;
+  link.href = url;
   link.target = "_blank";
   link.rel = "noopener noreferrer";
-  link.textContent = TIMESHEET_URL;
+  link.textContent = url;
   banner.append(link, " để tiếp tục log work.");
 }
 
@@ -211,14 +220,7 @@ function setEmpty(title, text) {
 }
 
 function isTimesheetUrl(url) {
-  if (!url) return false;
-  try {
-    const parsed = new URL(url);
-    const path = parsed.pathname.replace(/\/+$/, "") || "/";
-    return parsed.origin === "https://sra.smartosc.com" && path === "/time-sheet";
-  } catch {
-    return false;
-  }
+  return detectSurface(url, whitelistEntries) === "timesheet";
 }
 
 function requiredFieldsReady() {
@@ -271,7 +273,7 @@ function promptSessionExpired(tab) {
 
 function requireLogin(sessionText = "Mở trang chấm công và đăng nhập.") {
   sessionLine.textContent = sessionText;
-  showBanner(LOGIN_MESSAGE);
+  showBanner(loginMessage(whitelistEntries));
   setSessionReady(false);
   if (!typesLoaded) resetTypeSelect("Đăng nhập để tải danh sách");
 }
@@ -395,9 +397,20 @@ const ATTENDANCE_BUCKETS = [
 
 const WEEKDAY_SHORT = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 
+function denyAccess(account) {
+  stopCheckoutCountdown();
+  logwork.hidden = true;
+  peoplePanel.hidden = true;
+  setSessionReady(false);
+  sessionLine.textContent = account ? `${account} — không có quyền` : "Không có quyền";
+  hideFormError();
+  showBanner(ACCESS_DENIED_MESSAGE);
+}
+
 function showSurface(surface) {
   const people = surface === "people";
   const timesheet = surface === "timesheet";
+  if (!people) stopCheckoutCountdown();
   logwork.hidden = !timesheet;
   peoplePanel.hidden = !people;
   if (people) {
@@ -434,7 +447,14 @@ function attendanceLabel(row, withHours) {
   return `${date} · ${row.hours}`;
 }
 
+function stopCheckoutCountdown() {
+  if (checkoutTimer == null) return;
+  clearInterval(checkoutTimer);
+  checkoutTimer = null;
+}
+
 function renderTodayAnnounce(summary) {
+  stopCheckoutCountdown();
   if (!summary || summary.today.length === 0) {
     peopleAnnounce.hidden = true;
     peopleAnnounce.replaceChildren();
@@ -448,13 +468,48 @@ function renderTodayAnnounce(summary) {
   if (today.checkIn && checkout) {
     const title = document.createElement("p");
     title.className = "announce-title";
-    const time = document.createElement("strong");
-    time.textContent = checkout;
-    title.append("Checkout sớm nhất là ", time, " để đủ 8h");
+    title.append("Hôm nay đã vào lúc ");
+    const inTime = document.createElement("strong");
+    inTime.textContent = today.checkIn;
+    title.append(inTime);
+
     const detail = document.createElement("p");
     detail.className = "announce-detail";
-    detail.textContent = `${when} · đã vào lúc ${today.checkIn}`;
-    peopleAnnounce.append(title, detail);
+    detail.append("Checkout sớm nhất ");
+    const outTime = document.createElement("strong");
+    outTime.textContent = checkout;
+    detail.append(outTime, " để đủ 8 tiếng");
+
+    const label = document.createElement("p");
+    label.className = "announce-label";
+    const clock = document.createElement("p");
+    clock.className = "announce-clock";
+    clock.setAttribute("aria-hidden", "true");
+
+    const tick = () => {
+      const remaining = remainingMsUntilCheckout(today.checkIn);
+      if (remaining == null) {
+        label.textContent = "";
+        clock.textContent = "";
+        stopCheckoutCountdown();
+        return;
+      }
+      if (remaining <= 0) {
+        label.textContent = "Đã đủ 8 tiếng";
+        clock.textContent = "00:00:00";
+        clock.classList.add("done");
+        stopCheckoutCountdown();
+        return;
+      }
+      label.textContent = "Còn lại đến giờ checkout";
+      clock.textContent = formatCountdown(remaining);
+      clock.classList.remove("done");
+    };
+    tick();
+    if (checkoutTimer == null && remainingMsUntilCheckout(today.checkIn) > 0) {
+      checkoutTimer = setInterval(tick, 1000);
+    }
+    peopleAnnounce.append(title, detail, label, clock);
     return;
   }
   const title = document.createElement("p");
@@ -800,6 +855,7 @@ function resetPeopleState() {
   logAllButton.removeAttribute("aria-label");
   logAllButton.textContent = "Log all";
   peopleSummary.hidden = true;
+  stopCheckoutCountdown();
   peopleAnnounce.hidden = true;
   peopleAnnounce.replaceChildren();
   peopleBuckets.replaceChildren();
@@ -851,6 +907,12 @@ async function refreshPeople(tab, generation, { reset = false } = {}) {
     setPeopleStatus(message);
     return;
   }
+  const access = accessFromOrgUser(result.orgUser, allowedAccounts);
+  if (!result.orgUser || !access.ok) {
+    denyAccess(access.account);
+    setPeopleStatus(result.orgUser ? ACCESS_DENIED_MESSAGE : result.orgUserError || "Không kiểm tra được quyền truy cập.");
+    return;
+  }
   if (!result.view || !result.view.regDetails) {
     setPeopleStatus("API không trả dữ liệu kỳ này. Hãy thử tháng khác hoặc bấm Tải lại.");
     return;
@@ -877,7 +939,11 @@ async function refreshContext({ forceTypes = false, resetPeople = false } = {}) 
   const tab = await activeTab();
   if (generation !== contextGeneration) return;
 
-  const surface = detectSurface(tab && tab.url);
+  whitelistEntries = await loadWhitelist({ force: forceTypes });
+  allowedAccounts = await loadAllowedAccounts({ force: forceTypes });
+  if (generation !== contextGeneration) return;
+
+  const surface = detectSurface(tab && tab.url, whitelistEntries);
   showSurface(surface);
 
   if (surface === "people") {
@@ -888,7 +954,7 @@ async function refreshContext({ forceTypes = false, resetPeople = false } = {}) 
   if (surface !== "timesheet") {
     sessionLine.textContent = "Trang này không được hỗ trợ.";
     hideFormError();
-    showBanner(`Mở ${TIMESHEET_URL} để log work, hoặc people.zoho.com để xem và log chấm công.`);
+    showBanner(unsupportedMessage(whitelistEntries));
     setSessionReady(false);
     if (!typesLoaded) resetTypeSelect("Đăng nhập để tải danh sách");
     return;
@@ -935,6 +1001,17 @@ async function refreshContext({ forceTypes = false, resetPeople = false } = {}) 
     return;
   }
 
+  const access = canAccess({
+    account: user.username,
+    deptNameList: deptNameListFromUser(user),
+    allowedAccounts,
+  });
+  if (!access.ok) {
+    denyAccess(access.account || user.username);
+    if (!typesLoaded) resetTypeSelect("Không có quyền");
+    return;
+  }
+
   sessionLine.textContent = user.name ? `${user.name} (${user.username})` : user.username;
 
   if (!typesLoaded) {
@@ -955,7 +1032,7 @@ function missingFields() {
 
 function apiError(prefix, result) {
   if (result.error === "session-expired" || result.status === 401) return SESSION_EXPIRED_MESSAGE;
-  if (result.error === "missing-token") return LOGIN_MESSAGE;
+  if (result.error === "missing-token") return loginMessage(whitelistEntries);
   if (result.message && !/^HTTP \d+$/.test(result.message)) return `${prefix}. ${result.message}`;
   return `${prefix}. Hãy thử lại.`;
 }
@@ -1138,6 +1215,15 @@ async function ensureSession(tab) {
     setSessionReady(false);
     return null;
   }
+  const access = canAccess({
+    account: session.user.username,
+    deptNameList: deptNameListFromUser(session.user),
+    allowedAccounts,
+  });
+  if (!access.ok) {
+    denyAccess(access.account || session.user.username);
+    return null;
+  }
   return session;
 }
 
@@ -1146,7 +1232,7 @@ async function logWork() {
   hideFormError();
 
   if (!sessionReady) {
-    showBanner(LOGIN_MESSAGE);
+    showBanner(loginMessage(whitelistEntries));
     return;
   }
 
@@ -1193,6 +1279,7 @@ async function logWork() {
   const blocked = [];
 
   try {
+    whitelistEntries = await loadWhitelist();
     const tab = await activeTab();
     const session = await ensureSession(tab);
     if (!session) return;

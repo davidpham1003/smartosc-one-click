@@ -427,6 +427,30 @@ tr.fail td:last-child {
   font-size: 12px;
 }
 
+.announce-detail strong {
+  color: var(--ink);
+}
+
+.announce-label {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.announce-clock {
+  margin: 0;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.35;
+}
+
+.announce-clock.done {
+  color: var(--ok);
+}
+
 #people .status,
 #people .summary {
   margin: 0;

@@ -27,7 +27,18 @@ export async function runInPage(request) {
     const name = typeof user.name === "string" ? user.name.trim() : "";
     const id = typeof user.id === "number" && Number.isFinite(user.id) ? user.id : null;
     if (!username || id == null) return null;
-    return { id, username, name };
+    const departmentName =
+      user.department && typeof user.department === "object" && typeof user.department.name === "string"
+        ? user.department.name.trim()
+        : typeof user.department === "string"
+          ? user.department.trim()
+          : "";
+    const deptNameList = Array.isArray(user.deptNameList) && user.deptNameList.length > 0
+      ? user.deptNameList
+      : departmentName
+        ? [departmentName]
+        : [];
+    return { id, username, name, deptNameList };
   }
 
   function decodeJwtPayload(token) {

@@ -188,6 +188,7 @@ test("earliest checkout adds 8h plus remaining lunch", () => {
   assert.equal(earliestFullCheckout("09:00"), "18:15");
   assert.equal(earliestFullCheckout("08:49"), "18:04");
   assert.equal(earliestFullCheckout("12:30"), "21:15");
+  assert.equal(earliestFullCheckout("13:30"), "21:30");
   assert.equal(earliestFullCheckout("14:00"), "22:00");
   assert.equal(earliestFullCheckout(""), "");
   assert.equal(earliestFullCheckout("bad"), "");

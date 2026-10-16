@@ -64,11 +64,64 @@ function formatMinutes(minutes) {
   return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
 }
 
-export function earliestFullCheckout(checkIn) {
+function pad2(value) {
+  return String(value).padStart(2, "0");
+}
+
+function zonedParts(date, timeZone) {
+  const parts = {};
+  for (const part of new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(date)) {
+    if (part.type !== "literal") parts[part.type] = part.value;
+  }
+  return parts;
+}
+
+export function earliestFullCheckoutMinutes(checkIn) {
   const start = clockMinutes(checkIn);
-  if (start == null) return "";
+  if (start == null) return null;
   const remainingLunch = Math.max(0, LUNCH_END_MINUTES - Math.max(start, LUNCH_START_MINUTES));
-  return formatMinutes(start + FULL_MINUTES + remainingLunch);
+  return start + FULL_MINUTES + remainingLunch;
+}
+
+export function earliestFullCheckout(checkIn) {
+  const minutes = earliestFullCheckoutMinutes(checkIn);
+  if (minutes == null) return "";
+  return formatMinutes(minutes);
+}
+
+export function remainingMsUntilCheckout(checkIn, now = new Date(), timeZone = "Asia/Ho_Chi_Minh") {
+  const targetMinutes = earliestFullCheckoutMinutes(checkIn);
+  if (targetMinutes == null) return null;
+  const parts = zonedParts(now, timeZone);
+  const year = parts.year;
+  const month = parts.month;
+  const day = parts.day;
+  if (!year || !month || !day) return null;
+  const extraDays = Math.floor(targetMinutes / (24 * 60));
+  const clock = ((targetMinutes % (24 * 60)) + 24 * 60) % (24 * 60);
+  const hh = pad2(Math.floor(clock / 60));
+  const mm = pad2(clock % 60);
+  const target = new Date(`${year}-${month}-${day}T${hh}:${mm}:00+07:00`);
+  if (Number.isNaN(target.getTime())) return null;
+  return target.getTime() + extraDays * 24 * 60 * 60 * 1000 - now.getTime();
+}
+
+export function formatCountdown(ms) {
+  if (ms == null || !Number.isFinite(ms)) return "";
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = total % 60;
+  return `${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`;
 }
 
 function zohoKeyToIso(key) {
@@ -110,7 +163,8 @@ function summarizeFilo(regDetails, today) {
     const hasPunch = Boolean(checkIn) || minutes > 0;
     if (!hasPunch && day.isAbsent !== true) continue;
     if (today && iso > today) continue;
-    if (today && iso === today && minutes === 0) {
+    const stillIn = Boolean(checkIn) && !record.checkOut;
+    if (today && iso === today && (stillIn || minutes === 0)) {
       buckets.today.push(record);
       continue;
     }
@@ -132,6 +186,7 @@ export function summarizeAttendance(view, today) {
   const buckets = emptyBuckets();
   const dayList = view && view.dayList;
   if (!dayList || typeof dayList !== "object") return buckets;
+  const todayIso = today || "";
 
   const days = Object.values(dayList)
     .filter((day) => day && typeof day === "object" && typeof day.attDate === "string")
@@ -140,16 +195,18 @@ export function summarizeAttendance(view, today) {
   for (const day of days) {
     const status = typeof day.status === "string" ? day.status : "";
     if (day.futureAbsentDay || status === "" || isWeekendOrHoliday(status)) continue;
-    if (status === "Absent") {
-      buckets.absent.push(dayRecord(day, workedMinutes(day)));
-      continue;
-    }
     const minutes = workedMinutes(day);
-    if (day.isToday === true && minutes === 0) {
-      buckets.today.push(dayRecord(day, minutes));
+    const record = dayRecord(day, minutes);
+    const isToday = day.isToday === true || (todayIso && day.attDate === todayIso);
+    const stillIn = Boolean(record.checkIn) && !record.checkOut;
+    if (isToday && (stillIn || (!record.checkIn && minutes === 0 && status !== "Absent"))) {
+      buckets.today.push(record);
       continue;
     }
-    const record = dayRecord(day, minutes);
+    if (status === "Absent") {
+      buckets.absent.push(record);
+      continue;
+    }
     if (minutes >= FULL_MINUTES) buckets.full.push(record);
     else if (minutes >= MID_MINUTES) buckets.mid.push(record);
     else buckets.short.push(record);
