@@ -1,13 +1,12 @@
 {
   "manifest_version": 3,
   "name": "SmartOSC - One Click",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "author": "LuongPQ",
   "minimum_chrome_version": "114",
   "description": "Just one click for your daily SmartOSC routine: log work on SRA and register attendance on Zoho People. (by LuongPQ)",
   "permissions": ["sidePanel", "scripting", "tabs"],
   "host_permissions": [
-    "https://naloheesgmmtrjlxqwii.supabase.co/*",
     "https://sra.smartosc.com/*",
     "https://people.zoho.com/*",
     "https://people.smartosc.com/*"
