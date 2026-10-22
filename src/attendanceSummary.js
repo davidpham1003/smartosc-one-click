@@ -124,6 +124,32 @@ export function formatCountdown(ms) {
   return `${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`;
 }
 
+export function findTodayRecord(summary, today) {
+  if (!summary || typeof summary !== "object") return null;
+  if (Array.isArray(summary.today) && summary.today[0]) {
+    if (!today || summary.today[0].date === today) return summary.today[0];
+  }
+  if (!today) return null;
+  for (const key of ["full", "mid", "short", "absent"]) {
+    const rows = summary[key];
+    if (!Array.isArray(rows)) continue;
+    const row = rows.find((item) => item && item.date === today);
+    if (row) return row;
+  }
+  return null;
+}
+
+export function shouldShowEarliestCheckout(record, now = new Date()) {
+  if (!record) return false;
+  if (Number(record.minutes) >= FULL_MINUTES) return false;
+  const stillIn = Boolean(record.checkIn) && !record.checkOut;
+  if (stillIn) {
+    const remaining = remainingMsUntilCheckout(record.checkIn, now);
+    if (remaining != null && remaining <= 0) return false;
+  }
+  return true;
+}
+
 function zohoKeyToIso(key) {
   const match = /^(\d{2})-([A-Za-z]{3})-(\d{4})$/.exec(key || "");
   if (!match) return "";

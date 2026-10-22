@@ -1,17 +1,20 @@
-import { compareWorkLogs, hasWorkLogs, mismatchMessage } from "./allocation.js";
+import { compareWorkLogs, hasWorkLogs, mismatchMessage, summarizeAllocations } from "./allocation.js";
 import {
   applyRequestStatus,
   earliestFullCheckout,
+  findTodayRecord,
   formatCountdown,
   indexRequestStatus,
   readReportHeading,
   remainingMsUntilCheckout,
+  shouldShowEarliestCheckout,
   summarizeAttendance,
 } from "./attendanceSummary.js";
 import {
   attendancePeriod,
   buildAttendanceLog,
   buildAttendanceLogs,
+  defaultAttendanceMonth,
   MAX_PARTIAL_DAYS,
   requestStatusQueries,
   runInZohoPage,
@@ -58,6 +61,11 @@ const peopleAnnounce = document.querySelector("#people-announce");
 const peopleSummary = document.querySelector("#people-summary");
 const peopleBuckets = document.querySelector("#people-buckets");
 const logAllButton = document.querySelector("#log-all");
+const allocationsPanel = document.querySelector("#allocations");
+const allocationsStatus = document.querySelector("#allocations-status");
+const allocationsTableWrap = document.querySelector("#allocations-table-wrap");
+const allocationRows = document.querySelector("#allocation-rows");
+const allocationsTotal = document.querySelector("#allocations-total");
 
 let running = false;
 let peopleSourceTabId = null;
@@ -75,7 +83,7 @@ let reloadTabId = null;
 let sessionPromptResolve = null;
 
 monthInput.value = currentMonth();
-peopleMonthInput.value = currentMonth();
+peopleMonthInput.value = defaultAttendanceMonth(todayIso()) || currentMonth();
 applyFormLock();
 
 sessionDialog.addEventListener("cancel", (event) => {
@@ -103,7 +111,10 @@ form.addEventListener("submit", (event) => {
   if (running || submitButton.disabled) return;
   logWork();
 });
-monthInput.addEventListener("input", () => applyFormLock());
+monthInput.addEventListener("input", () => {
+  applyFormLock();
+  if (sessionReady) refreshAllocations();
+});
 typeSelect.addEventListener("change", () => applyFormLock());
 peopleMonthInput.addEventListener("change", () => {
   refreshContext({ resetPeople: true });
@@ -350,7 +361,7 @@ function fillTypes(typeOfWorks) {
   applyFormLock();
 }
 
-async function loadTypes(tab, generation) {
+async function loadTypes(tab, generation, user) {
   resetTypeSelect("Đang tải loại công việc…");
   typeSelect.disabled = true;
   const result = await callPage(tab.id, { action: "typeOfWork" });
@@ -386,6 +397,7 @@ async function loadTypes(tab, generation) {
   setSessionReady(true);
   hideBanner();
   noteHealthySession();
+  await loadAllocations(tab, user, generation);
 }
 
 const ATTENDANCE_BUCKETS = [
@@ -401,6 +413,7 @@ function denyAccess(account) {
   stopCheckoutCountdown();
   logwork.hidden = true;
   peoplePanel.hidden = true;
+  if (allocationsPanel) allocationsPanel.hidden = true;
   setSessionReady(false);
   sessionLine.textContent = account ? `${account} — không có quyền` : "Không có quyền";
   hideFormError();
@@ -453,14 +466,19 @@ function stopCheckoutCountdown() {
   checkoutTimer = null;
 }
 
+function hideTodayAnnounce() {
+  stopCheckoutCountdown();
+  peopleAnnounce.hidden = true;
+  peopleAnnounce.replaceChildren();
+}
+
 function renderTodayAnnounce(summary) {
   stopCheckoutCountdown();
-  if (!summary || summary.today.length === 0) {
-    peopleAnnounce.hidden = true;
-    peopleAnnounce.replaceChildren();
+  const today = findTodayRecord(summary, todayIso());
+  if (!shouldShowEarliestCheckout(today)) {
+    hideTodayAnnounce();
     return;
   }
-  const today = summary.today[0];
   const when = attendanceLabel(today, false);
   const checkout = earliestFullCheckout(today.checkIn);
   peopleAnnounce.hidden = false;
@@ -487,17 +505,14 @@ function renderTodayAnnounce(summary) {
     clock.setAttribute("aria-hidden", "true");
 
     const tick = () => {
-      const remaining = remainingMsUntilCheckout(today.checkIn);
-      if (remaining == null) {
-        label.textContent = "";
-        clock.textContent = "";
-        stopCheckoutCountdown();
+      if (!shouldShowEarliestCheckout(today)) {
+        hideTodayAnnounce();
         return;
       }
-      if (remaining <= 0) {
-        label.textContent = "Đã đủ 8 tiếng";
-        clock.textContent = "00:00:00";
-        clock.classList.add("done");
+      const remaining = remainingMsUntilCheckout(today.checkIn);
+      if (remaining == null || remaining <= 0) {
+        label.textContent = "";
+        clock.textContent = "";
         stopCheckoutCountdown();
         return;
       }
@@ -506,10 +521,10 @@ function renderTodayAnnounce(summary) {
       clock.classList.remove("done");
     };
     tick();
-    if (checkoutTimer == null && remainingMsUntilCheckout(today.checkIn) > 0) {
+    if (!peopleAnnounce.hidden && checkoutTimer == null && remainingMsUntilCheckout(today.checkIn) > 0) {
       checkoutTimer = setInterval(tick, 1000);
     }
-    peopleAnnounce.append(title, detail, label, clock);
+    if (!peopleAnnounce.hidden) peopleAnnounce.append(title, detail, label, clock);
     return;
   }
   const title = document.createElement("p");
@@ -865,7 +880,7 @@ async function refreshPeople(tab, generation, { reset = false } = {}) {
   peopleSourceTabId = tab && tab.id != null ? tab.id : null;
   hideBanner();
   hideFormError();
-  if (!peopleMonthInput.value) peopleMonthInput.value = currentMonth();
+  if (!peopleMonthInput.value) peopleMonthInput.value = defaultAttendanceMonth(todayIso()) || currentMonth();
   const period = attendancePeriod(peopleMonthInput.value);
   if (!period) {
     setPeopleStatus("Tháng không hợp lệ.");
@@ -947,11 +962,13 @@ async function refreshContext({ forceTypes = false, resetPeople = false } = {}) 
   showSurface(surface);
 
   if (surface === "people") {
+    hideAllocations();
     await refreshPeople(tab, generation, { reset: resetPeople });
     return;
   }
 
   if (surface !== "timesheet") {
+    hideAllocations();
     sessionLine.textContent = "Trang này không được hỗ trợ.";
     hideFormError();
     showBanner(unsupportedMessage(whitelistEntries));
@@ -1015,12 +1032,13 @@ async function refreshContext({ forceTypes = false, resetPeople = false } = {}) 
   sessionLine.textContent = user.name ? `${user.name} (${user.username})` : user.username;
 
   if (!typesLoaded) {
-    await loadTypes(tab, generation);
+    await loadTypes(tab, generation, user);
     return;
   }
   setSessionReady(true);
   hideBanner();
   noteHealthySession();
+  await loadAllocations(tab, user, generation);
 }
 
 function missingFields() {
@@ -1066,6 +1084,127 @@ function asPositiveHours(value) {
   const number = typeof value === "number" ? value : Number(String(value ?? "").trim());
   if (!Number.isFinite(number) || number <= 0) return null;
   return number;
+}
+
+function setAllocationsStatus(message) {
+  if (!allocationsStatus) return;
+  if (!message) {
+    allocationsStatus.hidden = true;
+    allocationsStatus.textContent = "";
+    return;
+  }
+  allocationsStatus.hidden = false;
+  allocationsStatus.textContent = message;
+}
+
+function hideAllocations() {
+  if (!allocationsPanel) return;
+  allocationsPanel.hidden = true;
+  if (allocationRows) allocationRows.replaceChildren();
+  if (allocationsTableWrap) allocationsTableWrap.hidden = true;
+  if (allocationsTotal) allocationsTotal.hidden = true;
+  setAllocationsStatus("");
+}
+
+function formatAllocDates(dates) {
+  return dates.map((iso) => {
+    const [, month, day] = iso.split("-");
+    return `${day}/${month}`;
+  }).join(", ");
+}
+
+function renderAllocations(summary) {
+  if (!allocationsPanel) return;
+  allocationsPanel.hidden = false;
+  allocationRows.replaceChildren();
+  const groups = summary && Array.isArray(summary.groups) ? summary.groups : [];
+  if (groups.length === 0) {
+    allocationsTableWrap.hidden = true;
+    allocationsTotal.hidden = true;
+    setAllocationsStatus("Tháng này chưa có giờ allocate.");
+    return;
+  }
+  setAllocationsStatus("");
+  allocationsTableWrap.hidden = false;
+  allocationsTotal.hidden = true;
+  for (const group of groups) {
+    for (const item of group.projects) {
+      const tr = document.createElement("tr");
+      const project = document.createElement("td");
+      project.textContent = formatProject(item.name, item.code);
+      const hours = document.createElement("td");
+      hours.textContent = String(item.hours);
+      tr.append(project, hours);
+      allocationRows.append(tr);
+    }
+    const datesRow = document.createElement("tr");
+    datesRow.className = "day-group";
+    const datesCell = document.createElement("td");
+    datesCell.colSpan = 2;
+    datesCell.textContent = `Ngày: ${formatAllocDates(group.dates)}`;
+    datesRow.append(datesCell);
+    allocationRows.append(datesRow);
+  }
+}
+
+async function loadAllocations(tab, user, generation = contextGeneration) {
+  if (!allocationsPanel || !tab || !user?.username || !monthInput.value) {
+    hideAllocations();
+    return;
+  }
+  allocationsPanel.hidden = false;
+  setAllocationsStatus("Đang tải allocate…");
+  allocationsTableWrap.hidden = true;
+  allocationsTotal.hidden = true;
+  allocationRows.replaceChildren();
+
+  const today = todayIso();
+  let preview;
+  try {
+    preview = classifyMonthDays({ yearMonth: monthInput.value, daysOff: [], holidayDates: [], today });
+  } catch {
+    setAllocationsStatus("Tháng không hợp lệ.");
+    return;
+  }
+  if (preview.startDate > today) {
+    setAllocationsStatus("Tháng này chưa tới.");
+    return;
+  }
+
+  const timesheet = await callPage(tab.id, {
+    action: "timesheet",
+    username: user.username,
+    startDate: preview.startDate,
+    endDate: clampToToday(preview.endDate, today),
+  });
+  if (generation !== contextGeneration) return;
+  if (isAuthFailure(timesheet)) {
+    hideAllocations();
+    await promptSessionExpired(tab);
+    return;
+  }
+  if (!timesheet.ok) {
+    setAllocationsStatus(apiError("Không tải được allocate", timesheet));
+    return;
+  }
+  const days = overviewDays(timesheet.data);
+  if (!days) {
+    setAllocationsStatus("Không đọc được bảng công.");
+    return;
+  }
+  renderAllocations(summarizeAllocations(days));
+}
+
+async function refreshAllocations() {
+  if (running || !sessionReady) return;
+  const tab = await activeTab();
+  if (!tab || !isTimesheetUrl(tab.url)) {
+    hideAllocations();
+    return;
+  }
+  const session = await callPage(tab.id, { action: "session" });
+  if (!session || !session.ok || !session.user) return;
+  await loadAllocations(tab, session.user);
 }
 
 function overviewDays(data) {

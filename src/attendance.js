@@ -31,6 +31,23 @@ export function attendancePeriod(yearMonth) {
   return { fromDate: zoho(from), toDate: zoho(to), fromIso: iso(from), toIso: iso(to) };
 }
 
+/** Attendance month is 21–20. From the 21st, the open period belongs to next month. */
+export function defaultAttendanceMonth(today) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(today || "").trim());
+  if (!match) return "";
+  let year = Number(match[1]);
+  let month = Number(match[2]);
+  const day = Number(match[3]);
+  if (day >= 21) {
+    month += 1;
+    if (month > 12) {
+      month = 1;
+      year += 1;
+    }
+  }
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
 /**
  * getMyRequest queries covering every calendar month in the period.
  * Zoho returns the month after sDate/eDate when navigate=1 (that is what the

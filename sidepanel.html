@@ -55,6 +55,23 @@
       </fieldset>
     </form>
 
+    <section id="allocations" class="allocations" hidden>
+      <h2>Allocate theo ngày</h2>
+      <p id="allocations-status" class="hint" hidden></p>
+      <div id="allocations-table-wrap" class="table-wrap" hidden>
+        <table>
+          <thead>
+            <tr>
+              <th>Project</th>
+              <th>Số giờ</th>
+            </tr>
+          </thead>
+          <tbody id="allocation-rows"></tbody>
+        </table>
+      </div>
+      <p id="allocations-total" class="allocations-total" hidden></p>
+    </section>
+
     <p id="status" class="status" hidden aria-live="polite"></p>
     <div id="summary" class="summary" hidden></div>
 

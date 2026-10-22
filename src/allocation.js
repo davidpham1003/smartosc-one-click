@@ -118,3 +118,45 @@ function projectLabel(item) {
 export function mismatchMessage(item) {
   return `Số giờ chưa khớp: ${projectLabel(item)} được allocate ${formatHours(item.allocated)} giờ, đã log work ${formatHours(item.logged)} giờ.`;
 }
+
+function dayDate(day) {
+  if (!day || typeof day.date !== "string") return "";
+  const match = /^(\d{4}-\d{2}-\d{2})/.exec(day.date.trim());
+  return match ? match[1] : "";
+}
+
+function allocationKey(projects) {
+  return projects.map((item) => `${item.code}:${item.hours}`).join("|");
+}
+
+export function summarizeAllocations(days) {
+  const byKey = new Map();
+  for (const day of Array.isArray(days) ? days : []) {
+    const date = dayDate(day);
+    const allocated = collectAllocated(day && day.allocated);
+    if (!date || allocated.size === 0) continue;
+    const projects = [...allocated.entries()]
+      .map(([code, item]) => ({
+        code,
+        name: item.name || "",
+        hours: item.hours,
+      }))
+      .sort((a, b) => b.hours - a.hours || a.code.localeCompare(b.code));
+    const key = allocationKey(projects);
+    const existing = byKey.get(key);
+    if (existing) {
+      existing.dates.push(date);
+      continue;
+    }
+    const totalHours = projects.reduce((sum, item) => sum + item.hours, 0);
+    byKey.set(key, {
+      projects,
+      totalHours: roundHours(totalHours) ?? 0,
+      dates: [date],
+    });
+  }
+  const groups = [...byKey.values()];
+  for (const group of groups) group.dates.sort((a, b) => a.localeCompare(b));
+  groups.sort((a, b) => a.dates[0].localeCompare(b.dates[0]));
+  return { groups };
+}

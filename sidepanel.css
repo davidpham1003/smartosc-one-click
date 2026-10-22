@@ -299,6 +299,28 @@ button[aria-busy="true"] {
   background: var(--card);
 }
 
+.allocations {
+  display: grid;
+  gap: 8px;
+  margin: 4px 16px 12px;
+}
+
+.allocations h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.allocations .table-wrap {
+  margin: 0;
+}
+
+.allocations-total {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;

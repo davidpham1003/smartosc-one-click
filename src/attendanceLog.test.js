@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   attendancePeriod,
+  defaultAttendanceMonth,
   buildAttendanceLog,
   buildAttendanceLogs,
   interpretAttendanceLogResponse,
@@ -37,6 +38,14 @@ test("request status queries cover each calendar month using the previous month 
     { sDate: "01-Dec-2025", eDate: "31-Dec-2025", navigate: "1" },
   ]);
   assert.deepEqual(requestStatusQueries(null), []);
+});
+
+test("from the 21st the default attendance month is next month", () => {
+  assert.equal(defaultAttendanceMonth("2026-10-20"), "2026-10");
+  assert.equal(defaultAttendanceMonth("2026-10-21"), "2026-11");
+  assert.equal(defaultAttendanceMonth("2026-10-22"), "2026-11");
+  assert.equal(defaultAttendanceMonth("2026-12-21"), "2027-01");
+  assert.equal(defaultAttendanceMonth(""), "");
 });
 
 test("attendance period runs from the 21st through the 20th", () => {
