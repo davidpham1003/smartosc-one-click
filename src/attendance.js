@@ -83,6 +83,36 @@ export function requestStatusQueries(period) {
 }
 
 export const MAX_PARTIAL_DAYS = 5;
+export const WORKDAY_END_MINUTES = LOG_TO_MINUTES;
+const FULL_DAY_MINUTES = 8 * 60;
+
+export function zonedClockMinutes(now = new Date(), timeZone = "Asia/Ho_Chi_Minh") {
+  const parts = {};
+  for (const part of new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    hour12: false,
+    hour: "2-digit",
+    minute: "2-digit",
+  }).formatToParts(now)) {
+    if (part.type !== "literal") parts[part.type] = part.value;
+  }
+  const hour = Number(parts.hour);
+  const minute = Number(parts.minute);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+  return hour * 60 + minute;
+}
+
+/** Today: hide Log Attendance unless it is the 20th, or after 18:15 without 8h. Other days stay loggable. */
+export function canShowAttendanceLogButton(row, { today, now } = {}) {
+  if (!row || typeof row.date !== "string" || !row.date) return false;
+  if (!today || row.date !== today) return true;
+  const day = Number(row.date.slice(8, 10));
+  if (day === 20) return true;
+  const clock = zonedClockMinutes(now);
+  if (clock == null) return false;
+  const minutes = Number(row.minutes) || 0;
+  return clock >= WORKDAY_END_MINUTES && minutes < FULL_DAY_MINUTES;
+}
 
 function zohoDateFromIso(isoDate) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate || "");

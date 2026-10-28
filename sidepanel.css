@@ -661,9 +661,23 @@ tr.fail td:last-child {
 }
 
 .bucket li.day-row > button,
-.bucket li.day-row > .status-badge {
+.bucket li.day-row > .status-badge,
+.bucket li.day-row > .today-wait-label {
   grid-column: 5;
   justify-self: end;
+}
+
+.today-wait-label {
+  min-width: 136px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--card));
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .bucket li.day-row > button {

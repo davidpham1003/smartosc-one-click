@@ -1,0 +1,34 @@
+---
+description: Bump Chrome extension version once per unpushed set, from the last pushed commit
+alwaysApply: true
+---
+
+# Bump extension version
+
+When runtime code changes (not tests/docs/rules only), keep `manifest.json` `"version"` ready for Chrome Web Store (each upload must be greater than the live version). Do not bump for `.cursor/`, README, tests, or sample `res/` / `curl/` files.
+
+Format: `MAJOR.MINOR.PATCH` (in `manifest.json` only).
+
+## Bump once from the latest pushed commit
+
+Before finishing, compare versions:
+
+1. **Working tree:** `manifest.json`
+2. **Latest commit:** `git show HEAD:manifest.json`
+3. **Last pushed:** `git show origin/main:manifest.json` (or `@{upstream}`). Unpushed = unpushed commits **or** uncommitted runtime changes.
+
+**Base** = version in the last **pushed** commit. If there is no upstream, base = version in HEAD.
+
+- If HEAD or the working tree is **already greater than base**, do **not** bump again. One raise covers the whole unpushed set (this conversation included).
+- If HEAD is pushed and working-tree version still equals HEAD, bump **once**.
+- If a later change in the same unpushed set is larger, **replace** the bump from **base** (do not stack). Example: origin `1.2.0` + PATCH then a MINOR feature → `1.3.0`, not `1.2.2`.
+
+| Change | Bump | From base |
+|---|---|---|
+| Tiny: copy, CSS, bug fix, grouping, message | **PATCH** | `1.2.0` → `1.2.1` |
+| New user-facing feature or surface/API | **MINOR** | `1.2.0` → `1.3.0` |
+| Breaking: remove a feature or required permission | **MAJOR** | `1.2.0` → `2.0.0` |
+
+Examples: PATCH — countdown size, denied copy, “Hôm nay” label. MINOR — Division 8 access, checkout countdown, allocate-by-day. MAJOR — drop a granted host permission, or remove log-work / log-attendance.
+
+After bumping or skipping, mention the version in the reply. The user still zips and uploads themselves.

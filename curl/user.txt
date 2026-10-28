@@ -1,0 +1,17 @@
+curl --url 'https://people.zoho.com/hrportal1524046581683/commonAction/getOrgUserListNew' \
+  -H 'Accept: */*' \
+  -H 'Accept-Language: en-US,en;q=0.9,vi;q=0.8' \
+  -H 'Connection: keep-alive' \
+  -H 'Content-Type: application/x-www-form-urlencoded; charset=UTF-8' \
+  -b 'People_BottomBanner=202922000027909002; __Secure-iamsdt=0.CAESdBIwt9rrIhGgcGVXe6FGEmZ5FDz_EfhUZL4TuWkCk4hjo06SOetiIdqFhh3NgNilu1BnGkCiy3SVMVlfYqHTkTFabq0UO7C9yxYfYdfDjmTbzZagglgm61M3qJtp0mEA96CeyZigKTq7DiikCOQsEQ1XkcoRIIvdgcX93L2_Cg; _iamadt=b7daeb2211a07065577ba146126679143cff11f85464be13b96902938863a34e9239eb6221da85861dcd80d8a5bb5067; _iambdt=a2cb749531595f62a1d391315a6ead143bb0bdcb161f61d7c38e64dbcd96a0825826eb5337a89b69d26100f7a09ec998a0293abb0e28a408e42c110d5791ca11; zalb_6570ccc01f=a13f7cfdbd8508b58e12ad76923fbd26; _zpsid=887E6B98ED0B2063997CF3C6F3807A21; CSRF_TOKEN=18fc6e38ba71214babd0edad3f96105c650707c18fa97d66914387ee2a83289993fe67111740088311b9ed817674b7c756274e9c06010f6378e2359aa7ae0d47; zalb_3309580ed5=af01e47c8bb237e248f92f9d1bd7405d; CT_CSRF_TOKEN=18fc6e38ba71214babd0edad3f96105c650707c18fa97d66914387ee2a83289993fe67111740088311b9ed817674b7c756274e9c06010f6378e2359aa7ae0d47; wms-tkp-token=831887361-b045dd91-f80b708899faf4d63b9eebfd22e22f13; zalb_8b7213828d=86e1df9d631368310b26f28cbc66a048; zalb_zid=659301474' \
+  -H 'Origin: https://people.zoho.com' \
+  -H 'Referer: https://people.zoho.com/hrportal1524046581683/zp' \
+  -H 'Sec-Fetch-Dest: empty' \
+  -H 'Sec-Fetch-Mode: cors' \
+  -H 'Sec-Fetch-Site: same-origin' \
+  -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36' \
+  -H 'X-Requested-With: XMLHttpRequest' \
+  -H 'sec-ch-ua: "Google Chrome";v="155", "Chromium";v="155", "Not(A:Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?0' \
+  -H 'sec-ch-ua-platform: "macOS"' \
+  --data-raw 'isInit=false&conreqcsr=18fc6e38ba71214babd0edad3f96105c650707c18fa97d66914387ee2a83289993fe67111740088311b9ed817674b7c756274e9c06010f6378e2359aa7ae0d47&userIds=%5B%22412762000208872805%22%5D'

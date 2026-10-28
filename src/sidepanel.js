@@ -14,6 +14,7 @@ import {
   attendancePeriod,
   buildAttendanceLog,
   buildAttendanceLogs,
+  canShowAttendanceLogButton,
   defaultAttendanceMonth,
   MAX_PARTIAL_DAYS,
   requestStatusQueries,
@@ -524,13 +525,40 @@ function renderTodayAnnounce(summary) {
     if (!peopleAnnounce.hidden && checkoutTimer == null && remainingMsUntilCheckout(today.checkIn) > 0) {
       checkoutTimer = setInterval(tick, 1000);
     }
-    if (!peopleAnnounce.hidden) peopleAnnounce.append(title, detail, label, clock);
+    if (!peopleAnnounce.hidden) {
+      peopleAnnounce.append(title, detail, label, clock);
+      appendTodayLogButton(today);
+    }
     return;
   }
   const title = document.createElement("p");
   title.className = "announce-title";
   title.textContent = `${when}: chưa có giờ vào.`;
   peopleAnnounce.append(title);
+  appendTodayLogButton(today);
+}
+
+function todayHasBucketRow(row) {
+  if (!peopleAttendance || !row) return false;
+  return ["mid", "short", "absent"].some((key) =>
+    (peopleAttendance[key] || []).some((item) => item.date === row.date),
+  );
+}
+
+function appendTodayLogButton(row) {
+  if (!canShowAttendanceLogButton(row, { today: todayIso() })) return;
+  if (todayHasBucketRow(row) || peopleDayButtons.has(row.date)) return;
+  const button = document.createElement("button");
+  button.type = "button";
+  button.dataset.date = row.date;
+  button.dataset.bucket = "today";
+  button.textContent = "Log Attendance";
+  peopleDayButtons.set(row.date, button);
+  button.addEventListener("click", () => {
+    logAttendanceDay(button, row, "Attendance");
+  });
+  peopleAnnounce.append(button);
+  if (loggedDates.has(row.date)) markDayLogged(row.date);
 }
 
 function renderBucket(spec, rows) {
@@ -586,6 +614,14 @@ function statusBadge(request) {
   return badge;
 }
 
+function todayWaitLabel() {
+  const label = document.createElement("span");
+  label.className = "today-wait-label";
+  label.textContent = "Hôm nay";
+  label.title = "Log Attendance hiện sau 18:15 nếu chưa đủ 8 tiếng";
+  return label;
+}
+
 function renderDayRows(rows, actionLabel, bucketKey) {
   const workFromHome = actionLabel === "Log work from home";
   const detailed = !workFromHome;
@@ -628,6 +664,11 @@ function renderDayRows(rows, actionLabel, bucketKey) {
       continue;
     }
     if (row.request) item.append(statusBadge(row.request));
+    if (!canShowAttendanceLogButton(row, { today: todayIso() })) {
+      item.append(todayWaitLabel());
+      list.append(item);
+      continue;
+    }
     const button = document.createElement("button");
     button.type = "button";
     button.dataset.date = row.date;
@@ -728,11 +769,12 @@ function unloggedRows(rows) {
 
 function logAllCandidates() {
   if (!peopleAttendance) return [];
+  const today = todayIso();
   return selectDaysToLog({
     absent: unloggedRows(peopleAttendance.absent),
     short: unloggedRows(peopleAttendance.short),
     mid: unloggedRows(peopleAttendance.mid),
-  });
+  }).filter((row) => canShowAttendanceLogButton(row, { today }));
 }
 
 /**

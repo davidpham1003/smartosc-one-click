@@ -8,6 +8,7 @@ import {
   interpretAttendanceLogResponse,
   requestStatusQueries,
   selectDaysToLog,
+  canShowAttendanceLogButton,
 } from "./attendance.js";
 
 test("log response treats explicit error bodies as failure", () => {
@@ -124,4 +125,19 @@ test("bulk log uses the first and last day with 09:00-18:15", () => {
 
 test("missing employee id is not a payload", () => {
   assert.equal(buildAttendanceLog({ isoDate: "2026-10-12", erecno: "  ", desc: "WFH" }), null);
+});
+
+test("today hides log attendance except the 20th or after 18:15 without 8h", () => {
+  const today = { date: "2026-10-22", minutes: 180 };
+  assert.equal(canShowAttendanceLogButton(today, { today: "2026-10-22", now: new Date("2026-10-22T10:00:00+07:00") }), false);
+  assert.equal(canShowAttendanceLogButton(today, { today: "2026-10-22", now: new Date("2026-10-22T18:15:00+07:00") }), true);
+  assert.equal(
+    canShowAttendanceLogButton({ date: "2026-10-22", minutes: 480 }, { today: "2026-10-22", now: new Date("2026-10-22T19:00:00+07:00") }),
+    false,
+  );
+  assert.equal(
+    canShowAttendanceLogButton({ date: "2026-10-20", minutes: 0 }, { today: "2026-10-20", now: new Date("2026-10-20T10:00:00+07:00") }),
+    true,
+  );
+  assert.equal(canShowAttendanceLogButton({ date: "2026-10-21", minutes: 180 }, { today: "2026-10-22", now: new Date() }), true);
 });

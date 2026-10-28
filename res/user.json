@@ -1,0 +1,76 @@
+{
+    "success": true,
+    "response": {
+      "deptNameList": [
+        "Division 8 - Center DEV"
+      ],
+      "unitIdList": [],
+      "deptIdList": [
+        "412762000209286729"
+      ],
+      "roleIdList": [
+        "412762000000035635"
+      ],
+      "OrganizationTagDisPlayName": "",
+      "divIdList": [],
+      "IS_TRANSFER_ALLOWED": false,
+      "entityNameList": [],
+      "hasProfilePicDCF": false,
+      "desiIdList": [
+        "412762000151855743"
+      ],
+      "unitNameList": [],
+      "isTransferV2Enabled": false,
+      "userList": [
+        [
+          "1",
+          "288",
+          "Lương",
+          "Phạm Quang",
+          "4520",
+          "412762000208872805",
+          "831887361",
+          "1",
+          "luongpq@smartosc.com",
+          "0",
+          "0",
+          "",
+          "0",
+          "0",
+          "",
+          "",
+          "",
+          "0",
+          "0",
+          "0",
+          "09-Oct-2023",
+          "0334068547",
+          "",
+          "",
+          "",
+          0,
+          0
+        ]
+      ],
+      "roleNameList": [
+        "Team member"
+      ],
+      "reposList": [
+        "412762000141734127"
+      ],
+      "divNameList": [],
+      "locIdList": [
+        "412762000108453469"
+      ],
+      "entityIdList": [],
+      "desiNameList": [
+        "Software Development Expert"
+      ],
+      "tagMap": "{}",
+      "orgStructureDispNameMap": "{\"division\":\"Division\",\"unit\":\"Business Unit\",\"department\":\"Center/ Function\",\"entity\":\"Company\"}",
+      "isOrgstructureFilterRestricted": false,
+      "locNameList": [
+        "Da Nang"
+      ]
+    }
+  }
